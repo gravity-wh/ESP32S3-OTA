@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 OTA 固件管理平台</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "PingFang SC", sans-serif;
+            background:
+                radial-gradient(circle at top right, rgba(255, 189, 89, 0.25), transparent 30%),
+                radial-gradient(circle at top left, rgba(76, 175, 255, 0.22), transparent 28%),
+                linear-gradient(180deg, #f6f8fc 0%, #eef3ff 100%);
+            color: #22314d;
+        }
+        .container { max-width: 1480px; margin: 0 auto; padding: 24px; }
+        .hero, .card {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(132, 154, 196, 0.18);
+            box-shadow: 0 16px 40px rgba(64, 93, 146, 0.12);
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+        }
+        .hero { padding: 24px 28px; margin-bottom: 20px; }
+        .hero h1 { margin: 0 0 8px; font-size: 30px; }
+        .hero p { margin: 0; color: #5a6887; line-height: 1.7; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+        .stat {
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(243, 247, 255, 0.92), rgba(232, 240, 255, 0.92));
+        }
+        .stat .label { color: #6e7c9c; font-size: 13px; }
+        .stat .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+        .layout {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 20px;
+        }
+        .stack { display: grid; gap: 20px; }
+        .card { padding: 22px; }
+        .card h2 { margin: 0 0 16px; font-size: 22px; }
+        .subtle { color: #6b7896; font-size: 14px; line-height: 1.7; }
+        .dropzone {
+            border: 2px dashed #6d8ff0;
+            border-radius: 18px;
+            padding: 28px;
+            background: linear-gradient(180deg, rgba(237, 243, 255, 0.75), rgba(250, 252, 255, 0.95));
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.18s, border-color 0.18s, background 0.18s;
+        }
+        .dropzone.dragover {
+            transform: translateY(-2px);
+            border-color: #365fd4;
+            background: linear-gradient(180deg, rgba(224, 235, 255, 0.95), rgba(244, 248, 255, 0.98));
+        }
+        .dropzone h3 { margin: 6px 0 8px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        label { display: block; font-weight: 600; margin: 12px 0 6px; }
+        input[type="text"], textarea {
+            width: 100%;
+            border: 1px solid #ced8f1;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 14px;
+            background: #fff;
+        }
+        textarea { min-height: 96px; resize: vertical; }
+        input[type="file"] { display: none; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .btn {
+            border: none;
+            border-radius: 12px;
+            padding: 11px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(135deg, #406ce8, #5b46e7);
+            box-shadow: 0 10px 20px rgba(70, 98, 188, 0.18);
+        }
+        .btn.secondary {
+            background: linear-gradient(135deg, #6f7c97, #4d5a73);
+        }
+        .btn.danger {
+            background: linear-gradient(135deg, #f26d6d, #d5456e);
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .ok { background: #def7e6; color: #15733f; }
+        .warn { background: #fff1d6; color: #935e00; }
+        .err { background: #ffe0e2; color: #a72837; }
+        .info { background: #e2edff; color: #3659ad; }
+        .progress {
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: #e7ecfa;
+            overflow: hidden;
+            display: none;
+            margin-top: 14px;
+        }
+        .progress > div {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, #406ce8, #53b6ff);
+            transition: width 0.15s;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+            font-size: 14px;
+        }
+        th, td { padding: 12px 10px; border-bottom: 1px solid #e8edf9; text-align: left; vertical-align: top; }
+        th { color: #607398; font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em; }
+        code { font-family: "Cascadia Code", "Consolas", monospace; word-break: break-all; }
+        .current-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            background: #edf4ff;
+            color: #2a5db8;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        details {
+            border: 1px solid #e8edf9;
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin-top: 10px;
+            background: #fbfcff;
+        }
+        details summary { cursor: pointer; font-weight: 700; }
+        .notes { margin: 12px 0 0; padding-left: 18px; color: #55657f; line-height: 1.7; }
+        .device-grid { display: grid; gap: 12px; }
+        .device {
+            border: 1px solid #e7edf9;
+            border-radius: 18px;
+            padding: 16px;
+            background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(243, 247, 255, 0.96));
+        }
+        .device-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        .device-title { font-size: 17px; font-weight: 700; }
+        .device-sub { color: #687893; font-size: 13px; margin-top: 4px; }
+        .kv {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 8px 12px;
+            margin-top: 14px;
+            font-size: 14px;
+        }
+        .kv .key { color: #6c7a95; }
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .tag {
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: #edf2ff;
+            color: #4d5da8;
+            font-size: 12px;
+        }
+        .log {
+            max-height: 320px;
+            overflow: auto;
+            border-radius: 16px;
+            background: #142031;
+            color: #dfebff;
+            padding: 14px;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            font-size: 13px;
+        }
+        .log .line { padding: 7px 8px; border-left: 3px solid #4c8cff; margin-bottom: 8px; background: rgba(255,255,255,0.03); }
+        .empty { color: #7c89a4; padding: 12px 0; }
+        @media (max-width: 1100px) {
+            .layout { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 700px) {
+            .container { padding: 14px; }
+            .grid-2 { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: 1fr; }
+            .kv { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <section class="hero">
+        <h1>ESP32 OTA 固件管理平台</h1>
+        <p>统一发布固件、自动生成 OTA 元数据、实时观察设备在线状态与升级结果。网页拖拽和 API 上传使用同一条发布链路，避免 bin 与 manifest 脱节。</p>
+        <div class="stats">
+            <div class="stat"><div class="label">当前发布版本</div><div class="value" id="statRelease">-</div></div>
+            <div class="stat"><div class="label">在线设备</div><div class="value" id="statOnline">0</div></div>
+            <div class="stat"><div class="label">固件总数</div><div class="value" id="statFirmware">0</div></div>
+            <div class="stat"><div class="label">最近更新时间</div><div class="value" id="statUpdated" style="font-size:15px;">-</div></div>
+        </div>
+    </section>
+
+    <div class="layout">
+        <div class="stack">
+            <section class="card">
+                <h2>统一发布</h2>
+                <p class="subtle">拖拽上传新的 <code>.bin</code> 固件，填写版本号与本次更新说明。系统会自动写入 <code>/firmware/version.txt</code> 和 <code>/firmware/manifest.json</code>，并把该固件设为当前发布版本。</p>
+
+                <div class="dropzone" id="dropzone" onclick="document.getElementById('releaseFile').click()">
+                    <div>拖拽或点击选择固件</div>
+                    <h3 id="dropzoneTitle">尚未选择 .bin 文件</h3>
+                    <div class="subtle" id="dropzoneHint">支持网页拖拽上传，也支持 API 调用 <code>POST /api/releases</code></div>
+                    <input type="file" id="releaseFile" accept=".bin">
+                </div>
+
+                <div class="grid-2">
+                    <div>
+                        <label for="releaseVersion">版本号</label>
+                        <input type="text" id="releaseVersion" placeholder="例如 v1.2.2-radar">
+                    </div>
+                    <div>
+                        <label>API 示例</label>
+                        <input type="text" id="apiHint" value='curl -F "file=@app.bin" -F "version=v1.2.2-radar" -F "description=..." -F "notes=..." http://116.62.218.129:8080/api/releases' readonly>
+                    </div>
+                </div>
+
+                <label for="releaseDescription">固件简介</label>
+                <input type="text" id="releaseDescription" placeholder="一句话介绍本次固件用途">
+
+                <label for="releaseNotes">更新说明</label>
+                <textarea id="releaseNotes" placeholder="每行一条，例如：&#10;优化 OLED 显示逻辑&#10;增加设备心跳与 OTA 状态上报"></textarea>
+
+                <div class="toolbar">
+                    <button class="btn" onclick="publishRelease()">发布新版本</button>
+                    <button class="btn secondary" onclick="refreshAll()">刷新数据</button>
+                </div>
+
+                <div class="progress" id="releaseProgress"><div id="releaseProgressFill"></div></div>
+                <div id="releaseStatus" style="margin-top:12px;"></div>
+            </section>
+
+            <section class="card">
+                <h2>固件列表</h2>
+                <p class="subtle">旧版本可直接删除，当前正在发布的固件会被保护，避免把 OTA 入口删空。</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>固件</th>
+                            <th>版本</th>
+                            <th>状态</th>
+                            <th>大小</th>
+                            <th>上传时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="firmwareTable"></tbody>
+                </table>
+            </section>
+        </div>
+
+        <div class="stack">
+            <section class="card">
+                <h2>设备管理</h2>
+                <p class="subtle">设备通过心跳自动上报在线状态、当前固件版本、最近 OTA 检查结果和最近升级时间，无需手工维护。</p>
+                <div class="toolbar">
+                    <button class="btn secondary" onclick="refreshDevices()">刷新设备</button>
+                </div>
+                <div id="deviceList" class="device-grid" style="margin-top:14px;"></div>
+            </section>
+
+            <section class="card">
+                <h2>当前发布信息</h2>
+                <div id="releasePanel" class="subtle">正在加载…</div>
+            </section>
+
+            <section class="card">
+                <h2>服务端日志</h2>
+                <div class="toolbar">
+                    <button class="btn secondary" onclick="loadLogs()">刷新日志</button>
+                    <button class="btn danger" onclick="clearLogs()">清空日志</button>
+                </div>
+                <div class="log" id="logContainer" style="margin-top:14px;"></div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_BASE = '';
+let selectedFile = null;
+let firmwares = [];
+let devices = [];
+let releaseMetadata = {};
+
+const esc = text => String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const formatSize = value => `${(Number(value || 0) / 1024).toFixed(2)} KB`;
+
+function badge(text, type = 'info') {
+    return `<span class="badge ${type}">${esc(text)}</span>`;
+}
+
+function showStatus(targetId, text, type = 'info') {
+    document.getElementById(targetId).innerHTML = badge(text, type);
+}
+
+function setSelectedFile(file) {
+    selectedFile = file || null;
+    document.getElementById('dropzoneTitle').textContent = file ? file.name : '尚未选择 .bin 文件';
+    document.getElementById('dropzoneHint').innerHTML = file
+        ? `文件大小 ${formatSize(file.size)}`
+        : '支持网页拖拽上传，也支持 API 调用 <code>POST /api/releases</code>';
+}
+
+function setupDropzone() {
+    const area = document.getElementById('dropzone');
+    const input = document.getElementById('releaseFile');
+    input.addEventListener('change', event => {
+        const file = event.target.files[0];
+        if (file) setSelectedFile(file);
+    });
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
+        area.addEventListener(name, event => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
+    });
+    ['dragenter', 'dragover'].forEach(name => area.addEventListener(name, () => area.classList.add('dragover')));
+    ['dragleave', 'drop'].forEach(name => area.addEventListener(name, () => area.classList.remove('dragover')));
+    area.addEventListener('drop', event => {
+        const file = event.dataTransfer.files[0];
+        if (file) setSelectedFile(file);
+    });
+}
+
+function renderStats() {
+    document.getElementById('statRelease').textContent = releaseMetadata.version || '-';
+    document.getElementById('statOnline').textContent = devices.filter(item => item.online).length;
+    document.getElementById('statFirmware').textContent = firmwares.length;
+    document.getElementById('statUpdated').textContent = releaseMetadata.updatedAt || '-';
+}
+
+function renderReleasePanel() {
+    const target = document.getElementById('releasePanel');
+    if (!releaseMetadata.version) {
+        target.innerHTML = '<div class="empty">暂无当前发布信息</div>';
+        return;
+    }
+    const notes = (releaseMetadata.notes || releaseMetadata.manifest?.notes || [])
+        .map(item => `<li>${esc(item)}</li>`)
+        .join('');
+    target.innerHTML = `
+        <div>${badge('当前发布', 'ok')}</div>
+        <div style="margin-top:12px;"><strong>${esc(releaseMetadata.version)}</strong></div>
+        <div class="subtle" style="margin-top:6px;">${esc(releaseMetadata.description || releaseMetadata.manifest?.description || '暂无简介')}</div>
+        <div class="kv" style="margin-top:12px;">
+            <div class="key">固件文件</div><div><code>${esc(releaseMetadata.file || releaseMetadata.manifest?.file || '-')}</code></div>
+            <div class="key">SHA256</div><div><code>${esc(releaseMetadata.manifest?.sha256 || '-')}</code></div>
+            <div class="key">更新时间</div><div>${esc(releaseMetadata.updatedAt || '-')}</div>
+        </div>
+        <details open>
+            <summary>本次固件修改说明</summary>
+            ${notes ? `<ul class="notes">${notes}</ul>` : '<div class="empty">暂无说明</div>'}
+        </details>
+    `;
+}
+
+function renderFirmwares() {
+    const body = document.getElementById('firmwareTable');
+    if (!firmwares.length) {
+        body.innerHTML = '<tr><td colspan="6" class="empty">暂无固件</td></tr>';
+        return;
+    }
+
+    body.innerHTML = firmwares.map(fw => {
+        const notes = (fw.notes || fw.manifest?.notes || []).map(item => `<li>${esc(item)}</li>`).join('');
+        const summary = fw.description || fw.manifest?.description || '暂无固件简介';
+        return `
+            <tr>
+                <td>
+                    <div><code>${esc(fw.name)}</code></div>
+                    <details>
+                        <summary>查看简介与改动</summary>
+                        <div class="subtle" style="margin-top:10px;">${esc(summary)}</div>
+                        ${notes ? `<ul class="notes">${notes}</ul>` : '<div class="empty">暂无更新说明</div>'}
+                    </details>
+                </td>
+                <td>${esc(fw.version || '-')}</td>
+                <td>${fw.isCurrent ? '<span class="current-chip">当前发布</span>' : badge('历史版本', 'warn')}</td>
+                <td>${formatSize(fw.size)}</td>
+                <td>${esc(fw.uploadTime || '-')}</td>
+                <td>
+                    <div class="toolbar" style="margin-top:0;">
+                        <button class="btn secondary" onclick="window.location.href='/firmware/${encodeURIComponent(fw.name)}'">下载</button>
+                        ${fw.isCurrent ? '' : `<button class="btn danger" onclick="deleteFirmware('${esc(fw.name)}')">删除</button>`}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderDevices() {
+    const target = document.getElementById('deviceList');
+    if (!devices.length) {
+        target.innerHTML = '<div class="empty">暂无设备心跳数据</div>';
+        return;
+    }
+    target.innerHTML = devices.map(device => {
+        const telemetry = device.telemetry || {};
+        const networkMode = device.networkMode || telemetry.networkMode || '-';
+        const uplink = device.uplink || telemetry.uplink || '-';
+        const modeGpio = device.modeSelectGpio ?? telemetry.modeSelectGpio ?? '-';
+        const modeGpioText = modeGpio === '-' ? '' : ` GPIO${esc(modeGpio)}`;
+        const radars = Array.isArray(telemetry.radars) ? telemetry.radars : [];
+        const radarText = radars.length
+            ? radars.map(radar => `ID${String(radar.address).padStart(2, '0')}=${radar.distanceMm ?? '-'}mm`).join(' / ')
+            : `${esc(telemetry.distanceMm ?? '-')} mm`;
+        return `
+            <div class="device">
+                <div class="device-head">
+                    <div>
+                        <div class="device-title">${esc(device.name || device.id)}</div>
+                        <div class="device-sub">${esc(device.id || '-')}</div>
+                    </div>
+                    <div>${device.online ? badge('在线', 'ok') : badge('离线', 'err')}</div>
+                </div>
+                <div class="kv">
+                    <div class="key">当前版本</div><div>${esc(device.appVersion || '-')}</div>
+                    <div class="key">固件文件</div><div><code>${esc(device.firmware || '-')}</code></div>
+                    <div class="key">通信链路</div><div>${badge(String(networkMode).toUpperCase(), networkMode === '4g' ? 'warn' : 'info')} <code>${esc(uplink)}</code>${modeGpioText}</div>
+                    <div class="key">IP / MAC</div><div><code>${esc(device.ip || '-')}</code> / <code>${esc(device.mac || '-')}</code></div>
+                    <div class="key">最近心跳</div><div>${esc(device.lastSeen || '-')}</div>
+                    <div class="key">OTA 状态</div><div>${esc(device.lastOtaState || '-')} ${device.lastOtaResult ? `(${esc(device.lastOtaResult)})` : ''}</div>
+                    <div class="key">升级时间</div><div>${esc(device.lastUpgradeAt || device.lastFirmwareChangeAt || '-')}</div>
+                    <div class="key">升级变更</div><div>${esc(device.lastUpgradeFrom || '-')} → ${esc(device.lastUpgradeTo || device.appVersion || '-')}</div>
+                    <div class="key">雷达 / 轮询</div><div>${esc(radarText)}${radars.length ? ` · 占用 ${esc(telemetry.occupiedCount ?? '-')}/${esc(telemetry.radarCount ?? radars.length)}` : ''}, OK ${esc(telemetry.pollOkCount ?? '-')}, ERR ${esc(telemetry.pollErrorCount ?? '-')}</div>
+                </div>
+                <div class="tags">
+                    ${(device.tags || []).map(tag => `<span class="tag">${esc(tag)}</span>`).join('') || '<span class="empty">无标签</span>'}
+                </div>
+                ${device.lastOtaMessage ? `<div class="subtle" style="margin-top:10px;">${esc(device.lastOtaMessage)}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function renderLogs(logs) {
+    const target = document.getElementById('logContainer');
+    if (!logs.length) {
+        target.innerHTML = '<div class="line">暂无日志</div>';
+        return;
+    }
+    target.innerHTML = logs.slice().reverse().map(item => `<div class="line">[${esc(item.time || '-')}] ${esc(item.message || '')}</div>`).join('');
+}
+
+async function loadFirmwares() {
+    const response = await fetch(`${API_BASE}/api/firmwares`, { cache: 'no-store' });
+    firmwares = await response.json();
+    renderFirmwares();
+}
+
+async function loadDevices() {
+    const response = await fetch(`${API_BASE}/api/devices`, { cache: 'no-store' });
+    devices = await response.json();
+    renderDevices();
+}
+
+async function loadReleaseMetadata() {
+    const response = await fetch(`${API_BASE}/api/release-metadata`, { cache: 'no-store' });
+    releaseMetadata = await response.json();
+    renderReleasePanel();
+}
+
+async function loadLogs() {
+    const response = await fetch(`${API_BASE}/api/logs`, { cache: 'no-store' });
+    const logs = await response.json();
+    renderLogs(logs);
+}
+
+async function refreshDevices() {
+    await loadDevices();
+    renderStats();
+}
+
+async function refreshAll() {
+    await Promise.all([loadFirmwares(), loadDevices(), loadReleaseMetadata(), loadLogs()]);
+    renderStats();
+}
+
+async function clearLogs() {
+    await fetch(`${API_BASE}/api/logs`, { method: 'DELETE' });
+    await loadLogs();
+}
+
+async function deleteFirmware(name) {
+    if (!confirm(`确认删除旧固件 ${name} 吗？`)) return;
+    const response = await fetch(`${API_BASE}/api/firmwares/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+        showStatus('releaseStatus', payload.message || `删除失败 HTTP ${response.status}`, 'err');
+        return;
+    }
+    showStatus('releaseStatus', `已删除 ${name}`, 'ok');
+    await refreshAll();
+}
+
+function publishRelease() {
+    if (!selectedFile) {
+        showStatus('releaseStatus', '请先选择 .bin 文件', 'err');
+        return;
+    }
+    if (!selectedFile.name.endsWith('.bin')) {
+        showStatus('releaseStatus', '只支持 .bin 文件', 'err');
+        return;
+    }
+
+    const version = document.getElementById('releaseVersion').value.trim();
+    const description = document.getElementById('releaseDescription').value.trim();
+    const notes = document.getElementById('releaseNotes').value;
+    if (!version) {
+        showStatus('releaseStatus', '请填写版本号', 'err');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile, selectedFile.name);
+    formData.append('version', version);
+    formData.append('description', description);
+    formData.append('notes', notes);
+
+    const progress = document.getElementById('releaseProgress');
+    const fill = document.getElementById('releaseProgressFill');
+    progress.style.display = 'block';
+    fill.style.width = '0%';
+    showStatus('releaseStatus', '正在发布新固件…', 'info');
+
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', event => {
+        if (event.lengthComputable) {
+            fill.style.width = `${event.loaded / event.total * 100}%`;
+        }
+    });
+    xhr.addEventListener('load', async () => {
+        progress.style.display = 'none';
+        fill.style.width = '0%';
+        try {
+            const payload = JSON.parse(xhr.responseText || '{}');
+            if (xhr.status >= 200 && xhr.status < 300 && payload.success) {
+                showStatus('releaseStatus', `发布成功：${payload.data.release.version}`, 'ok');
+                document.getElementById('releaseFile').value = '';
+                document.getElementById('releaseDescription').value = '';
+                document.getElementById('releaseNotes').value = '';
+                setSelectedFile(null);
+                await refreshAll();
+            } else {
+                showStatus('releaseStatus', payload.message || `发布失败 HTTP ${xhr.status}`, 'err');
+            }
+        } catch (error) {
+            showStatus('releaseStatus', `发布失败：${error.message}`, 'err');
+        }
+    });
+    xhr.addEventListener('error', () => {
+        progress.style.display = 'none';
+        showStatus('releaseStatus', '网络错误，发布失败', 'err');
+    });
+    xhr.open('POST', `${API_BASE}/api/releases`);
+    xhr.send(formData);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    setupDropzone();
+    await refreshAll();
+    setInterval(refreshDevices, 10000);
+});
+</script>
+</body>
+</html>

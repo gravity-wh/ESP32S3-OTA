@@ -1,0 +1,11 @@
+{
+  "version": "v1.3.2",
+  "file": "radar_oled_ota_v1.3.2.bin",
+  "size": 979360,
+  "sha256": "2e3e77c324e9678113ca1e65f5d4c5ec7a8c3062319887c48e18db85fbbb935f",
+  "url": "http://116.62.218.129:8080/firmware/radar_oled_ota_v1.3.2.bin",
+  "notes": [
+    "Final validated build. Boots with RS485 multi-radar queue from address 02 upward, reports all radar distances and occupancy to OTA and radar platforms, OLED shows ID02 and occupied/total, 4G EC801E retrieves OTA manifest over PDP/QHTTP, and 8081 cloud commands execute on the ESP32 edge gateway."
+  ],
+  "description": "Multi-radar edge gateway final: Wi-Fi telemetry, 4G OTA manifest transport, cloud-to-edge radar commands"
+}

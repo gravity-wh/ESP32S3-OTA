@@ -1,0 +1,15 @@
+[Unit]
+Description=Radar Address Binding Platform Backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/radar-address-binding-platform
+ExecStart=/usr/bin/python3 /root/radar-address-binding-platform/radar_platform.py
+Restart=always
+RestartSec=5
+Environment=RADAR_PLATFORM_PUBLIC_BASE_URL=http://116.62.218.129:8081
+
+[Install]
+WantedBy=multi-user.target

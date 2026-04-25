@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雷达地址绑定平台</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: rgba(15, 23, 42, 0.82);
+            --panel-light: rgba(30, 41, 59, 0.96);
+            --line: rgba(148, 163, 184, 0.25);
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --primary: #60a5fa;
+            --success: #2ecc71;
+            --warn: #ff9f43;
+            --danger: #ff6b6b;
+            --disabled: #7c8597;
+            --bound: #4f7cff;
+            --shadow: 0 18px 40px rgba(2, 6, 23, 0.4);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: radial-gradient(circle at top, #1e293b 0, #0f172a 50%, #020617 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1680px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .hero, .panel {
+            background: var(--panel);
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .hero {
+            padding: 24px;
+            margin-bottom: 18px;
+        }
+
+        .hero h1 {
+            margin: 0 0 10px;
+            font-size: 2rem;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .toolbar {
+            margin-top: 18px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .toolbar .group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 10px 12px;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 2.25fr 1fr;
+            gap: 18px;
+        }
+
+        .stack {
+            display: grid;
+            gap: 18px;
+        }
+
+        .panel {
+            padding: 18px;
+        }
+
+        .panel h2, .panel h3 {
+            margin-top: 0;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        input, select, textarea, button {
+            font: inherit;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.72);
+            color: var(--text);
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 12px;
+            padding: 10px 12px;
+            outline: none;
+        }
+
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        button {
+            background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        button.secondary {
+            background: rgba(100, 116, 139, 0.28);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            color: var(--text);
+        }
+
+        button.warn { background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); }
+        button.danger { background: linear-gradient(135deg, #fb7185 0%, #ef4444 100%); }
+        button.success { background: linear-gradient(135deg, #34d399 0%, #10b981 100%); }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            background: rgba(96, 165, 250, 0.12);
+            color: #bfdbfe;
+            border: 1px solid rgba(96, 165, 250, 0.25);
+        }
+
+        .legend {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid var(--line);
+            font-size: 13px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .form-grid.compact-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+        }
+
+        .field label {
+            color: #cbd5e1;
+            font-size: 14px;
+        }
+
+        .checkbox-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-row input[type='checkbox'] {
+            width: auto;
+        }
+
+        .parking-grid-wrap {
+            overflow: auto;
+            padding-top: 8px;
+        }
+
+        .parking-grid {
+            display: grid;
+            gap: 10px;
+            min-width: fit-content;
+        }
+
+        .corner-cell,
+        .header-cell,
+        .slot-cell {
+            border-radius: 14px;
+            min-height: 88px;
+            padding: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+
+        .corner-cell, .header-cell {
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(30, 41, 59, 0.75);
+            color: #cbd5e1;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+
+        .slot-cell {
+            cursor: pointer;
+            position: relative;
+            display: grid;
+            gap: 6px;
+            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .slot-cell:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255,255,255,0.32);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.36);
+        }
+
+        .slot-cell.active {
+            outline: 2px solid rgba(96, 165, 250, 0.95);
+            box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.16);
+        }
+
+        .slot-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .slot-title strong {
+            font-size: 16px;
+        }
+
+        .slot-meta {
+            font-size: 12px;
+            color: rgba(255,255,255,0.86);
+            display: grid;
+            gap: 2px;
+        }
+
+        .slot-status {
+            font-size: 12px;
+            background: rgba(15,23,42,0.2);
+            padding: 6px 8px;
+            border-radius: 10px;
+            color: rgba(255,255,255,0.92);
+        }
+
+        .slot-disabled { background: rgba(124, 133, 151, 0.33); }
+        .slot-enabled { background: rgba(139, 149, 167, 0.55); }
+        .slot-bound { background: rgba(79, 124, 255, 0.48); }
+        .slot-fault { background: rgba(255, 107, 107, 0.48); }
+        .slot-occupied { background: rgba(255, 159, 67, 0.52); }
+        .slot-free { background: rgba(46, 204, 113, 0.45); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 12px 10px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            color: #bfdbfe;
+            font-weight: 700;
+        }
+
+        .table-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .table-actions button {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 10px;
+        }
+
+        .log-box {
+            background: rgba(2, 6, 23, 0.78);
+            border-radius: 14px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            padding: 12px;
+            max-height: 320px;
+            overflow: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 12px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .log-entry {
+            border-left: 3px solid rgba(96, 165, 250, 0.85);
+            padding: 8px 10px;
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 8px;
+        }
+
+        .status-strip {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .metric {
+            min-width: 160px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.48);
+            border: 1px solid var(--line);
+        }
+
+        .metric .value {
+            font-size: 22px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .helper {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 1200px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 860px) {
+            .form-grid,
+            .form-grid.compact-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <section class="hero">
+        <h1>🚗 雷达地址绑定平台</h1>
+        <p>
+            将停车位示意图、RS485 总线、Modbus-RTU 雷达地址编程与车位绑定统一到一个可视化平台里。
+            支持动态编辑行列、绑定雷达地址、扫描总线、轮询状态、模拟联调和日志审计。
+        </p>
+        <div class="toolbar">
+            <div class="group">
+                <span class="badge">服务地址 http://116.62.218.129:8081/</span>
+                <span class="badge" id="healthBadge">等待健康检查</span>
+            </div>
+            <div class="group">
+                <button onclick="refreshAll()">刷新总览</button>
+                <button class="secondary" onclick="pollAllRadars()">轮询全部绑定雷达</button>
+                <button class="secondary" onclick="loadLogs()">刷新日志</button>
+                <button class="danger" onclick="clearLogs()">清空日志</button>
+            </div>
+        </div>
+        <div class="status-strip" id="summaryMetrics"></div>
+        <div class="legend">
+            <div class="legend-item"><span class="dot" style="background:#b7bec9"></span>未启用</div>
+            <div class="legend-item"><span class="dot" style="background:#8b95a7"></span>已启用待绑定</div>
+            <div class="legend-item"><span class="dot" style="background:#4f7cff"></span>已绑定待确认</div>
+            <div class="legend-item"><span class="dot" style="background:#ff6b6b"></span>异常 / 离线</div>
+            <div class="legend-item"><span class="dot" style="background:#ff9f43"></span>有车占用</div>
+            <div class="legend-item"><span class="dot" style="background:#2ecc71"></span>空闲</div>
+        </div>
+    </section>
+
+    <div class="grid-layout">
+        <div class="stack">
+            <section class="panel">
+                <h2>停车位可视化</h2>
+                <div class="form-grid compact-3">
+                    <div class="field">
+                        <label>行数（罗马数字）</label>
+                        <input type="number" id="layoutRows" min="1" max="32">
+                    </div>
+                    <div class="field">
+                        <label>列数（A/B/C...）</label>
+                        <input type="number" id="layoutCols" min="1" max="32">
+                    </div>
+                    <div class="field" style="align-content:end;">
+                        <label>&nbsp;</label>
+                        <button onclick="saveLayout()">更新布局</button>
+                    </div>
+                </div>
+                <p class="helper">点击任意车位单元格，可在右侧编辑启用状态、备注和绑定雷达。</p>
+                <div class="parking-grid-wrap">
+                    <div class="parking-grid" id="parkingGrid"></div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>雷达管理</h2>
+                <div class="form-grid compact-3">
+                    <div class="field">
+                        <label>雷达名称</label>
+                        <input type="text" id="newRadarName" placeholder="例如 北侧 1 号雷达">
+                    </div>
+                    <div class="field">
+                        <label>雷达地址</label>
+                        <input type="number" id="newRadarAddress" min="1" max="254" placeholder="例如 2">
+                    </div>
+                    <div class="field" style="align-content:end;">
+                        <label>&nbsp;</label>
+                        <button onclick="createRadar()">新增雷达记录</button>
+                    </div>
+                </div>
+                <div class="helper">建议先通过“地址扫描”发现雷达，再与车位绑定；若现场还没上电，可先手动创建记录。</div>
+                <div style="overflow:auto; margin-top: 12px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>名称</th>
+                                <th>地址</th>
+                                <th>车位</th>
+                                <th>距离</th>
+                                <th>在线</th>
+                                <th>最近轮询</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="radarTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Modbus / RS485 工具台</h2>
+                <div class="form-grid compact-3">
+                    <div class="field">
+                        <label>扫描起始地址</label>
+                        <input type="number" id="discoverStart" min="1" max="254" value="1">
+                    </div>
+                    <div class="field">
+                        <label>扫描结束地址</label>
+                        <input type="number" id="discoverEnd" min="1" max="254" value="16">
+                    </div>
+                    <div class="field" style="align-content:end;">
+                        <label>&nbsp;</label>
+                        <button class="secondary" onclick="discoverRadars()">扫描总线</button>
+                    </div>
+                </div>
+
+                <div class="form-grid" style="margin-top: 14px;">
+                    <div class="field">
+                        <label>原地址 / 新雷达地址</label>
+                        <input type="number" id="programSourceAddress" min="1" max="255" value="1" placeholder="默认 1，未知地址可用 255">
+                    </div>
+                    <div class="field">
+                        <label>目标地址</label>
+                        <input type="number" id="programTargetAddress" min="1" max="254" value="2" placeholder="例如 2">
+                    </div>
+                    <div class="field">
+                        <label>绑定车位（可选）</label>
+                        <select id="programSlotId"></select>
+                    </div>
+                    <div class="field">
+                        <label>雷达名称（可选）</label>
+                        <input type="text" id="programRadarName" placeholder="例如 东入口雷达">
+                    </div>
+                </div>
+                <div style="margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="warn" onclick="programAddress()">写入雷达地址并绑定</button>
+                </div>
+
+                <div class="form-grid compact-3" style="margin-top: 18px;">
+                    <div class="field">
+                        <label>读寄存器地址</label>
+                        <input type="number" id="rawReadAddress" min="1" max="255" value="1">
+                    </div>
+                    <div class="field">
+                        <label>起始寄存器</label>
+                        <input type="number" id="rawReadStart" min="0" value="16">
+                    </div>
+                    <div class="field">
+                        <label>数量</label>
+                        <input type="number" id="rawReadCount" min="1" max="16" value="1">
+                    </div>
+                </div>
+                <div style="margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="secondary" onclick="readRegisters()">读取寄存器</button>
+                    <button class="secondary" onclick="writeRegister()">写入寄存器</button>
+                </div>
+                <div class="helper" id="toolResult">这里会显示扫描 / 读写 / 编址结果。</div>
+            </section>
+        </div>
+
+        <div class="stack">
+            <section class="panel">
+                <h2>车位编辑器</h2>
+                <div class="helper">先点击左侧车位，再在此处编辑。</div>
+                <div class="form-grid" style="margin-top: 12px;">
+                    <div class="field">
+                        <label>车位编号</label>
+                        <input type="text" id="slotId" readonly>
+                    </div>
+                    <div class="field">
+                        <label>显示名称</label>
+                        <input type="text" id="slotName" placeholder="例如 VIP 车位">
+                    </div>
+                </div>
+                <div class="checkbox-row" style="margin-top: 12px;">
+                    <label><input type="checkbox" id="slotEnabled"> 启用该车位</label>
+                </div>
+                <div class="field" style="margin-top: 12px;">
+                    <label>绑定雷达</label>
+                    <select id="slotRadarId"></select>
+                </div>
+                <div class="field" style="margin-top: 12px;">
+                    <label>备注</label>
+                    <textarea id="slotNotes" placeholder="例如 靠近入口，建议优先分配"></textarea>
+                </div>
+                <div style="margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button onclick="saveSlot()">保存车位配置</button>
+                    <button class="secondary" onclick="clearSlotEditor()">清空选择</button>
+                </div>
+                <div class="helper" id="slotStateHint">尚未选择车位。</div>
+            </section>
+
+            <section class="panel">
+                <h2>边缘网关下行</h2>
+                <div class="helper" id="edgeSummary">等待 ESP32 边缘网关心跳。</div>
+                <div class="form-grid compact-3" style="margin-top: 12px;">
+                    <div class="field">
+                        <label>网关设备</label>
+                        <select id="edgeDeviceId"></select>
+                    </div>
+                    <div class="field">
+                        <label>命令类型</label>
+                        <select id="edgeCommandAction">
+                            <option value="read_distance">查询距离</option>
+                            <option value="read_registers">读寄存器</option>
+                            <option value="write_register">写寄存器</option>
+                            <option value="change_address">更改地址</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>雷达地址</label>
+                        <input type="number" id="edgeCommandAddress" min="1" max="254" value="2">
+                    </div>
+                    <div class="field">
+                        <label>起始/写入寄存器</label>
+                        <input type="number" id="edgeCommandRegister" min="0" value="16">
+                    </div>
+                    <div class="field">
+                        <label>数量/写入值</label>
+                        <input type="number" id="edgeCommandValue" min="0" value="1">
+                    </div>
+                    <div class="field">
+                        <label>目标地址</label>
+                        <input type="number" id="edgeCommandTarget" min="1" max="254" value="3">
+                    </div>
+                </div>
+                <div style="margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="warn" onclick="sendEdgeCommand()">发送下行命令</button>
+                </div>
+                <div class="log-box" id="edgeCommandBox" style="margin-top: 12px;"></div>
+            </section>
+
+            <section class="panel">
+                <h2>运行阈值与总线配置</h2>
+                <div class="form-grid compact-3">
+                    <div class="field">
+                        <label>占用最小距离 (mm)</label>
+                        <input type="number" id="thresholdOccupiedMin">
+                    </div>
+                    <div class="field">
+                        <label>占用最大距离 (mm)</label>
+                        <input type="number" id="thresholdOccupiedMax">
+                    </div>
+                    <div class="field">
+                        <label>空闲最小距离 (mm)</label>
+                        <input type="number" id="thresholdFreeMin">
+                    </div>
+                    <div class="field">
+                        <label>异常最小距离 (mm)</label>
+                        <input type="number" id="thresholdFaultMin">
+                    </div>
+                    <div class="field">
+                        <label>异常参考上限 (mm)</label>
+                        <input type="number" id="thresholdFaultMax">
+                    </div>
+                    <div class="field">
+                        <label>自动轮询周期 (秒)</label>
+                        <input type="number" id="pollIntervalSec" min="2">
+                    </div>
+                </div>
+                <div class="checkbox-row" style="margin-top: 12px;">
+                    <label><input type="checkbox" id="simulationMode"> 模拟模式（无真实串口也可联调）</label>
+                    <label><input type="checkbox" id="autoPollEnabled"> 启用后台自动轮询</label>
+                </div>
+
+                <h3 style="margin-top: 18px;">默认串口配置</h3>
+                <div class="form-grid compact-3">
+                    <div class="field"><label>端口</label><input type="text" id="serialPort"></div>
+                    <div class="field"><label>波特率</label><input type="number" id="serialBaudrate"></div>
+                    <div class="field"><label>超时 (秒)</label><input type="number" id="serialTimeout" step="0.05"></div>
+                    <div class="field"><label>数据位</label><input type="number" id="serialBytesize"></div>
+                    <div class="field"><label>校验</label><input type="text" id="serialParity"></div>
+                    <div class="field"><label>停止位</label><input type="number" id="serialStopbits"></div>
+                </div>
+
+                <h3 style="margin-top: 18px;">默认 Modbus 模板</h3>
+                <div class="form-grid compact-3">
+                    <div class="field"><label>地址寄存器</label><input type="number" id="modbusAddressRegister"></div>
+                    <div class="field"><label>距离寄存器</label><input type="number" id="modbusDistanceRegister"></div>
+                    <div class="field"><label>状态寄存器</label><input type="number" id="modbusStatusRegister"></div>
+                    <div class="field"><label>轮询起始寄存器</label><input type="number" id="modbusPollStart"></div>
+                    <div class="field"><label>轮询寄存器数量</label><input type="number" id="modbusPollCount"></div>
+                    <div class="field"><label>在线状态值</label><input type="number" id="modbusOnlineValue"></div>
+                </div>
+                <div style="margin-top: 12px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="success" onclick="saveSettingsAndProfiles()">保存设置与模板</button>
+                </div>
+                <div class="helper">由于不同雷达厂家寄存器定义可能不同，页面内所有寄存器地址都可修改，不对硬件协议做死假设。</div>
+            </section>
+
+            <section class="panel">
+                <h2>平台日志</h2>
+                <div class="log-box" id="logBox"></div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<script>
+const state = {
+    dashboard: null,
+    selectedSlotId: '',
+};
+
+async function api(path, options = {}) {
+    const response = await fetch(path, {
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {}),
+        },
+        ...options,
+    });
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await response.json() : await response.text();
+    if (!response.ok) {
+        const message = typeof data === 'string' ? data : (data.message || '请求失败');
+        throw new Error(message);
+    }
+    return data;
+}
+
+function setHealthBadge(text, ok = true) {
+    const badge = document.getElementById('healthBadge');
+    badge.textContent = text;
+    badge.style.borderColor = ok ? 'rgba(52,211,153,.35)' : 'rgba(251,113,133,.35)';
+    badge.style.color = ok ? '#bbf7d0' : '#fecdd3';
+    badge.style.background = ok ? 'rgba(16,185,129,.12)' : 'rgba(239,68,68,.12)';
+}
+
+function formatValue(value, fallback = '--') {
+    return value === null || value === undefined || value === '' ? fallback : value;
+}
+
+function summaryMetric(title, value, desc) {
+    return `
+        <div class="metric">
+            <div class="muted">${title}</div>
+            <div class="value">${value}</div>
+            <div class="helper">${desc}</div>
+        </div>
+    `;
+}
+
+function updateSummaryMetrics() {
+    if (!state.dashboard) return;
+    const slots = state.dashboard.slots || [];
+    const counts = {
+        total: slots.length,
+        enabled: slots.filter(item => item.enabled).length,
+        occupied: slots.filter(item => item.derivedState?.code === 'occupied').length,
+        free: slots.filter(item => item.derivedState?.code === 'free').length,
+        fault: slots.filter(item => item.derivedState?.code === 'fault').length,
+        bound: slots.filter(item => item.derivedState?.code === 'bound').length,
+    };
+    document.getElementById('summaryMetrics').innerHTML = [
+        summaryMetric('总车位数', counts.total, '当前布局中的所有单元格'),
+        summaryMetric('已启用', counts.enabled, '已经参与管理的车位'),
+        summaryMetric('有车占用', counts.occupied, '距离落在占用阈值区间'),
+        summaryMetric('空闲', counts.free, '距离高于空闲阈值'),
+        summaryMetric('异常', counts.fault, '离线或测距异常'),
+        summaryMetric('待确认', counts.bound, '已绑定但距离处于中间区间'),
+    ].join('');
+}
+
+function renderGrid() {
+    if (!state.dashboard) return;
+    const layout = state.dashboard.layout;
+    const slots = state.dashboard.slots || [];
+    document.getElementById('layoutRows').value = layout.rows;
+    document.getElementById('layoutCols').value = layout.columns;
+
+    const grid = document.getElementById('parkingGrid');
+    grid.style.gridTemplateColumns = `90px repeat(${layout.columns}, minmax(138px, 1fr))`;
+
+    const cells = [];
+    cells.push('<div class="corner-cell">车位</div>');
+    layout.columnLabels.forEach(label => cells.push(`<div class="header-cell">${label}</div>`));
+
+    for (let rowIndex = 0; rowIndex < layout.rows; rowIndex += 1) {
+        cells.push(`<div class="header-cell">${layout.rowLabels[rowIndex]}</div>`);
+        for (let colIndex = 0; colIndex < layout.columns; colIndex += 1) {
+            const slot = slots[rowIndex * layout.columns + colIndex];
+            const stateCode = slot.derivedState?.code || 'disabled';
+            const activeClass = slot.id === state.selectedSlotId ? 'active' : '';
+            cells.push(`
+                <div class="slot-cell slot-${stateCode} ${activeClass}" onclick="selectSlot('${slot.id}')">
+                    <div class="slot-title">
+                        <strong>${slot.id}</strong>
+                        <span>${slot.name ? slot.name : ''}</span>
+                    </div>
+                    <div class="slot-meta">
+                        <span>雷达：${slot.radar ? slot.radar.address : '未绑定'}</span>
+                        <span>距离：${slot.radar ? formatValue(slot.radar.lastDistanceMm, '--') + ' mm' : '--'}</span>
+                    </div>
+                    <div class="slot-status">${slot.derivedState?.label || '未知'} · ${slot.derivedState?.detail || ''}</div>
+                </div>
+            `);
+        }
+    }
+    grid.innerHTML = cells.join('');
+
+    const slotSelect = document.getElementById('programSlotId');
+    slotSelect.innerHTML = '<option value="">不立即绑定车位</option>' + (layout.slots || []).map(slot => `<option value="${slot.id}">${slot.id}</option>`).join('');
+}
+
+function renderRadarOptions() {
+    const select = document.getElementById('slotRadarId');
+    const radars = state.dashboard?.radars || [];
+    select.innerHTML = '<option value="">未绑定雷达</option>' + radars.map(radar => {
+        const label = `${radar.name} / 地址 ${radar.address}${radar.slotId ? ' / 已绑定 ' + radar.slotId : ''}`;
+        return `<option value="${radar.id}">${label}</option>`;
+    }).join('');
+}
+
+function renderRadarTable() {
+    const tbody = document.getElementById('radarTableBody');
+    const radars = state.dashboard?.radars || [];
+    if (!radars.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">暂无雷达记录</td></tr>';
+        return;
+    }
+    tbody.innerHTML = radars.map(radar => `
+        <tr>
+            <td>${radar.name}</td>
+            <td>${radar.address}</td>
+            <td>${formatValue(radar.slotId)}</td>
+            <td>${formatValue(radar.lastDistanceMm)}</td>
+            <td>${radar.online ? '在线' : '离线'}</td>
+            <td>${formatValue(radar.lastPollTime)}</td>
+            <td>
+                <div class="table-actions">
+                    <button class="secondary" onclick="pollOne('${radar.id}')">轮询</button>
+                    <button class="secondary" onclick="setSimulation('${radar.id}', 500, true)">模拟占用</button>
+                    <button class="secondary" onclick="setSimulation('${radar.id}', 1200, true)">模拟空闲</button>
+                    <button class="secondary" onclick="setSimulation('${radar.id}', 20, true)">模拟异常</button>
+                    <button class="danger" onclick="setSimulation('${radar.id}', null, false)">模拟离线</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderEdgeControls() {
+    const devices = state.dashboard?.edgeDevices || [];
+    const commands = state.dashboard?.edgeCommands || [];
+    const select = document.getElementById('edgeDeviceId');
+    const summary = document.getElementById('edgeSummary');
+    const box = document.getElementById('edgeCommandBox');
+
+    if (!devices.length) {
+        select.innerHTML = '<option value="">暂无在线边缘网关</option>';
+        summary.textContent = '等待 ESP32 边缘网关心跳。';
+    } else {
+        select.innerHTML = devices.map(device => (
+            `<option value="${device.id}">${device.name || device.id} / ${device.id}</option>`
+        )).join('');
+        const device = devices[0];
+        summary.textContent = `${device.id} · ${device.radarCount || 0} 雷达 · ${device.occupiedCount || 0} 占用 · ${device.lastSeen || '--'}`;
+    }
+
+    if (!commands.length) {
+        box.innerHTML = '<div class="muted">暂无下行命令记录</div>';
+        return;
+    }
+    box.innerHTML = commands.slice().reverse().map(command => `
+        <div class="log-entry">
+            <div>[${command.createdAt || '--'}] ${command.action} / 地址 ${formatValue(command.address)} / ${command.status}</div>
+            <div style="margin-top:4px;">${command.message || JSON.stringify(command.result || {})}</div>
+        </div>
+    `).join('');
+}
+
+function updateEditor() {
+    const slots = state.dashboard?.slots || [];
+    const slot = slots.find(item => item.id === state.selectedSlotId);
+    if (!slot) {
+        clearSlotEditor();
+        return;
+    }
+    document.getElementById('slotId').value = slot.id;
+    document.getElementById('slotName').value = slot.name || '';
+    document.getElementById('slotEnabled').checked = !!slot.enabled;
+    document.getElementById('slotRadarId').value = slot.radarId || '';
+    document.getElementById('slotNotes').value = slot.notes || '';
+    document.getElementById('slotStateHint').textContent = `${slot.derivedState?.label || '未知'}：${slot.derivedState?.detail || ''}`;
+}
+
+function clearSlotEditor() {
+    state.selectedSlotId = '';
+    document.getElementById('slotId').value = '';
+    document.getElementById('slotName').value = '';
+    document.getElementById('slotEnabled').checked = false;
+    document.getElementById('slotRadarId').value = '';
+    document.getElementById('slotNotes').value = '';
+    document.getElementById('slotStateHint').textContent = '尚未选择车位。';
+    renderGrid();
+}
+
+function selectSlot(slotId) {
+    state.selectedSlotId = slotId;
+    renderGrid();
+    renderRadarOptions();
+    updateEditor();
+}
+
+function fillSettings() {
+    if (!state.dashboard) return;
+    const settings = state.dashboard.settings || {};
+    const thresholds = settings.thresholds || {};
+    document.getElementById('thresholdOccupiedMin').value = thresholds.occupiedMinMm ?? 300;
+    document.getElementById('thresholdOccupiedMax').value = thresholds.occupiedMaxMm ?? 1000;
+    document.getElementById('thresholdFreeMin').value = thresholds.freeMinMm ?? 1000;
+    document.getElementById('thresholdFaultMin').value = thresholds.faultMinMm ?? 10;
+    document.getElementById('thresholdFaultMax').value = thresholds.faultMaxMm ?? 300;
+    document.getElementById('pollIntervalSec').value = settings.pollIntervalSec ?? 10;
+    document.getElementById('simulationMode').checked = !!settings.simulationMode;
+    document.getElementById('autoPollEnabled').checked = !!settings.autoPollEnabled;
+
+    const serialProfile = (state.dashboard.serialProfiles || [])[0] || {};
+    document.getElementById('serialPort').value = serialProfile.port || '/dev/ttyUSB0';
+    document.getElementById('serialBaudrate').value = serialProfile.baudrate || 115200;
+    document.getElementById('serialTimeout').value = serialProfile.timeoutSec || 0.3;
+    document.getElementById('serialBytesize').value = serialProfile.bytesize || 8;
+    document.getElementById('serialParity').value = serialProfile.parity || 'N';
+    document.getElementById('serialStopbits').value = serialProfile.stopbits || 1;
+
+    const modbusProfile = (state.dashboard.modbusProfiles || [])[0] || {};
+    document.getElementById('modbusAddressRegister').value = modbusProfile.addressRegister ?? 21;
+    document.getElementById('modbusDistanceRegister').value = modbusProfile.distanceRegister ?? 16;
+    document.getElementById('modbusStatusRegister').value = modbusProfile.statusRegister ?? 0;
+    document.getElementById('modbusPollStart').value = modbusProfile.pollRegisterStart ?? 16;
+    document.getElementById('modbusPollCount').value = modbusProfile.pollRegisterCount ?? 1;
+    document.getElementById('modbusOnlineValue').value = modbusProfile.onlineStatusValue ?? 1;
+}
+
+async function refreshAll() {
+    try {
+        const [health, dashboard] = await Promise.all([
+            api('/health'),
+            api('/api/dashboard'),
+        ]);
+        state.dashboard = dashboard;
+        setHealthBadge(`健康：${health.message} / ${health.radarCount} 雷达 / ${health.slotCount} 车位`, true);
+        renderGrid();
+        renderRadarOptions();
+        renderRadarTable();
+        renderEdgeControls();
+        updateSummaryMetrics();
+        fillSettings();
+        updateEditor();
+        await loadLogs();
+    } catch (error) {
+        setHealthBadge(`异常：${error.message}`, false);
+    }
+}
+
+async function loadLogs() {
+    try {
+        const logs = await api('/api/logs');
+        const box = document.getElementById('logBox');
+        if (!logs.length) {
+            box.innerHTML = '<div class="muted">暂无日志</div>';
+            return;
+        }
+        box.innerHTML = logs.slice().reverse().map(item => `
+            <div class="log-entry">
+                <div>[${item.time}] ${item.type}</div>
+                <div style="margin-top:4px;">${item.message}</div>
+            </div>
+        `).join('');
+    } catch (error) {
+        document.getElementById('logBox').innerHTML = `<div class="log-entry">日志加载失败：${error.message}</div>`;
+    }
+}
+
+async function clearLogs() {
+    await api('/api/logs', { method: 'DELETE' });
+    await loadLogs();
+}
+
+async function saveLayout() {
+    await api('/api/layout', {
+        method: 'PUT',
+        body: JSON.stringify({
+            rows: Number(document.getElementById('layoutRows').value || 4),
+            columns: Number(document.getElementById('layoutCols').value || 4),
+        }),
+    });
+    await refreshAll();
+}
+
+async function createRadar() {
+    const name = document.getElementById('newRadarName').value.trim();
+    const address = Number(document.getElementById('newRadarAddress').value || 0);
+    if (!address) {
+        alert('请填写雷达地址');
+        return;
+    }
+    await api('/api/radars', {
+        method: 'POST',
+        body: JSON.stringify({ name: name || `Radar ${address}`, address }),
+    });
+    document.getElementById('newRadarName').value = '';
+    document.getElementById('newRadarAddress').value = '';
+    await refreshAll();
+}
+
+async function saveSlot() {
+    const slotId = document.getElementById('slotId').value;
+    if (!slotId) {
+        alert('请先选择车位');
+        return;
+    }
+    await api(`/api/slots/${slotId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+            enabled: document.getElementById('slotEnabled').checked,
+            name: document.getElementById('slotName').value.trim(),
+            radarId: document.getElementById('slotRadarId').value,
+            notes: document.getElementById('slotNotes').value.trim(),
+        }),
+    });
+    await refreshAll();
+    selectSlot(slotId);
+}
+
+async function saveSettingsAndProfiles() {
+    await api('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+            simulationMode: document.getElementById('simulationMode').checked,
+            autoPollEnabled: document.getElementById('autoPollEnabled').checked,
+            pollIntervalSec: Number(document.getElementById('pollIntervalSec').value || 10),
+            thresholds: {
+                occupiedMinMm: Number(document.getElementById('thresholdOccupiedMin').value || 300),
+                occupiedMaxMm: Number(document.getElementById('thresholdOccupiedMax').value || 1000),
+                freeMinMm: Number(document.getElementById('thresholdFreeMin').value || 1000),
+                faultMinMm: Number(document.getElementById('thresholdFaultMin').value || 10),
+                faultMaxMm: Number(document.getElementById('thresholdFaultMax').value || 300),
+            },
+        }),
+    });
+
+    await api('/api/serial-profiles', {
+        method: 'PUT',
+        body: JSON.stringify({
+            profiles: [{
+                id: 'serial-default',
+                name: '默认 485 总线',
+                port: document.getElementById('serialPort').value.trim(),
+                baudrate: Number(document.getElementById('serialBaudrate').value || 115200),
+                timeoutSec: Number(document.getElementById('serialTimeout').value || 0.3),
+                bytesize: Number(document.getElementById('serialBytesize').value || 8),
+                parity: document.getElementById('serialParity').value.trim() || 'N',
+                stopbits: Number(document.getElementById('serialStopbits').value || 1),
+                enabled: true,
+            }],
+        }),
+    });
+
+    await api('/api/modbus-profiles', {
+        method: 'PUT',
+        body: JSON.stringify({
+            profiles: [{
+                id: 'modbus-default',
+                name: '默认雷达寄存器模板',
+                addressRegister: Number(document.getElementById('modbusAddressRegister').value || 21),
+                distanceRegister: Number(document.getElementById('modbusDistanceRegister').value || 16),
+                statusRegister: Number(document.getElementById('modbusStatusRegister').value || 0),
+                pollRegisterStart: Number(document.getElementById('modbusPollStart').value || 16),
+                pollRegisterCount: Number(document.getElementById('modbusPollCount').value || 1),
+                onlineStatusValue: Number(document.getElementById('modbusOnlineValue').value || 1),
+            }],
+        }),
+    });
+
+    await refreshAll();
+}
+
+async function discoverRadars() {
+    const startAddress = Number(document.getElementById('discoverStart').value || 1);
+    const endAddress = Number(document.getElementById('discoverEnd').value || startAddress);
+    const result = await api('/api/modbus/discover', {
+        method: 'POST',
+        body: JSON.stringify({ startAddress, endAddress }),
+    });
+    document.getElementById('toolResult').textContent = `扫描完成：发现 ${result.data.found.length} 个雷达。`;
+    await refreshAll();
+}
+
+async function programAddress() {
+    const sourceAddress = Number(document.getElementById('programSourceAddress').value || 0);
+    const targetAddress = Number(document.getElementById('programTargetAddress').value || 0);
+    if (!sourceAddress || !targetAddress) {
+        alert('请填写原地址和目标地址');
+        return;
+    }
+    const result = await api('/api/modbus/address/program', {
+        method: 'POST',
+        body: JSON.stringify({
+            sourceAddress,
+            targetAddress,
+            slotId: document.getElementById('programSlotId').value || '',
+            name: document.getElementById('programRadarName').value.trim(),
+        }),
+    });
+    document.getElementById('toolResult').textContent = `编址成功：${sourceAddress} -> ${result.data.radar.address}`;
+    await refreshAll();
+}
+
+async function readRegisters() {
+    const result = await api('/api/modbus/read-registers', {
+        method: 'POST',
+        body: JSON.stringify({
+            address: Number(document.getElementById('rawReadAddress').value || 1),
+            startRegister: Number(document.getElementById('rawReadStart').value || 2),
+            quantity: Number(document.getElementById('rawReadCount').value || 2),
+        }),
+    });
+    document.getElementById('toolResult').textContent = `读寄存器结果：${JSON.stringify(result.data.values)}`;
+}
+
+async function writeRegister() {
+    const address = Number(prompt('请输入目标地址', document.getElementById('rawReadAddress').value || '1'));
+    const register = Number(prompt('请输入寄存器地址', document.getElementById('rawReadStart').value || '1'));
+    const value = Number(prompt('请输入写入值', '1'));
+    if (!address || Number.isNaN(register) || Number.isNaN(value)) return;
+    const result = await api('/api/modbus/write-register', {
+        method: 'POST',
+        body: JSON.stringify({ address, register, value }),
+    });
+    document.getElementById('toolResult').textContent = `写寄存器成功：${JSON.stringify(result.data)}`;
+    await refreshAll();
+}
+
+async function pollAllRadars() {
+    const result = await api('/api/modbus/poll-all', { method: 'POST', body: JSON.stringify({}) });
+    document.getElementById('toolResult').textContent = `完成轮询：${result.data.results.length} 个绑定雷达。`;
+    await refreshAll();
+}
+
+async function pollOne(radarId) {
+    try {
+        await api(`/api/modbus/poll-one/${radarId}`, { method: 'POST', body: JSON.stringify({}) });
+    } catch (error) {
+        document.getElementById('toolResult').textContent = `单雷达轮询失败：${error.message}`;
+    }
+    await refreshAll();
+}
+
+async function setSimulation(radarId, distanceMm, online) {
+    await api(`/api/radars/${radarId}/simulation`, {
+        method: 'POST',
+        body: JSON.stringify({
+            distanceMm,
+            online,
+            statusWord: online ? 1 : 0,
+        }),
+    });
+    await refreshAll();
+}
+
+async function sendEdgeCommand() {
+    const deviceId = document.getElementById('edgeDeviceId').value;
+    const action = document.getElementById('edgeCommandAction').value;
+    const address = Number(document.getElementById('edgeCommandAddress').value || 0);
+    const register = Number(document.getElementById('edgeCommandRegister').value || 0);
+    const value = Number(document.getElementById('edgeCommandValue').value || 0);
+    const targetAddress = Number(document.getElementById('edgeCommandTarget').value || 0);
+    if (!deviceId || !address) {
+        alert('请选择网关并填写雷达地址');
+        return;
+    }
+    const payload = { action, address };
+    if (action === 'read_registers') {
+        payload.startRegister = register;
+        payload.quantity = Math.max(1, value || 1);
+    } else if (action === 'write_register') {
+        payload.register = register;
+        payload.value = value;
+    } else if (action === 'change_address') {
+        payload.targetAddress = targetAddress;
+    }
+    await api(`/api/edge/devices/${deviceId}/commands`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+    await refreshAll();
+}
+
+window.addEventListener('load', refreshAll);
+</script>
+</body>
+</html>

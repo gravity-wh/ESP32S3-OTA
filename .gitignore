@@ -1,0 +1,13 @@
+firmware/build*/
+firmware/managed_components/
+firmware/.cache/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.log
+ota-server/firmware/*.bin
+radar-platform/data/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,14 @@
+[Unit]
+Description=ESP32 OTA Firmware Management Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/esp32-ota-server
+ExecStart=/usr/bin/python3 /root/esp32-ota-server/ota_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

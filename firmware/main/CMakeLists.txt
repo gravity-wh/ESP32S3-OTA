@@ -1,0 +1,20 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "cellular_ota_service.c"
+        "device_service.c"
+        "ota_service.c"
+        "radar_oled_app.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        app_update
+        esp_driver_i2c
+        esp_driver_uart
+        esp_driver_usb_serial_jtag
+        esp_event
+        esp_http_client
+        esp_https_ota
+        esp_netif
+        esp_wifi
+        nvs_flash
+)
