@@ -1181,6 +1181,70 @@ def complete_edge_command(data, device_id, command_id, payload):
     return command
 
 
+def get_active_edge_device_id(data, preferred_device_id=None):
+    """返回最合适的边缘设备 ID（优先指定，否则取最近在线设备）。"""
+    devices = data.get("edgeDevices", [])
+    if preferred_device_id:
+        if any(d.get("id") == preferred_device_id for d in devices):
+            return preferred_device_id
+    online = [d for d in devices if d.get("online")]
+    if online:
+        online.sort(key=lambda d: d.get("lastSeen") or "", reverse=True)
+        return online[0]["id"]
+    if devices:
+        return devices[0]["id"]
+    return None
+
+
+def execute_via_edge(device_id, action, command_payload, timeout=22, poll_interval=1.5):
+    """透明桥接：将 Modbus 操作下发到 ESP32 边缘设备，同步等待结果。
+
+    工作流程：
+      1. 创建 pending 边缘命令写入数据文件
+      2. ESP32 每 5s 轮询 /api/edge/devices/<id>/commands 取走命令
+      3. ESP32 执行完成后回调 /api/edge/devices/<id>/commands/<cmd_id>/complete
+      4. 本函数轮询数据文件直到命令状态变为 success/failed
+
+    返回 (result_dict, error_str)，成功时 error_str 为 None。
+    """
+    data = load_data()
+    cmd_dict = dict(command_payload, deviceId=device_id, action=action, status="pending", createdAt=now_str())
+    command = normalize_edge_command(cmd_dict)
+    data.setdefault("edgeCommands", []).append(command)
+    push_operation_history(data, "edge.command.create", {
+        "deviceId": device_id,
+        "commandId": command["id"],
+        "action": action,
+    })
+    save_data(data)
+    command_id = command["id"]
+    logger.info("edge bridge: dispatched %s cmd=%s device=%s", action, command_id, device_id)
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(poll_interval)
+        fresh = load_data()
+        cmd = next((c for c in fresh.get("edgeCommands", []) if c["id"] == command_id), None)
+        if cmd is None:
+            return None, "边缘命令记录丢失"
+        if cmd["status"] == "success":
+            logger.info("edge bridge: success cmd=%s", command_id)
+            return cmd.get("result") or {}, None
+        if cmd["status"] == "failed":
+            logger.info("edge bridge: failed cmd=%s msg=%s", command_id, cmd.get("message"))
+            return None, cmd.get("message") or "边缘设备执行失败"
+    # 超时：将命令标记为 failed
+    fresh = load_data()
+    cmd = next((c for c in fresh.get("edgeCommands", []) if c["id"] == command_id), None)
+    if cmd and cmd["status"] in ("pending", "delivered"):
+        cmd["status"] = "failed"
+        cmd["completedAt"] = now_str()
+        cmd["message"] = "云端等待超时（%ds），ESP32 每 5s 轮询一次命令" % timeout
+        save_data(fresh)
+    logger.warning("edge bridge: timeout cmd=%s device=%s", command_id, device_id)
+    return None, "等待边缘设备响应超时（%ds）。ESP32 每 5s 轮询一次，请确认设备在线后重试。" % timeout
+
+
 def update_simulation(data, radar_id, payload):
     radar = get_radar(data, radar_id)
     if radar is None:
@@ -1439,13 +1503,23 @@ def replace_modbus_profiles():
 
 @app.route("/api/modbus/read-registers", methods=["POST"])
 def read_registers():
-    if not server_modbus_enabled():
-        return server_modbus_disabled_response()
     data = load_data()
     payload = request.get_json(silent=True) or {}
     address = max(1, min(254, coerce_int(payload.get("address"), 1)))
     start_register = max(0, coerce_int(payload.get("startRegister"), 0))
     quantity = max(1, min(32, coerce_int(payload.get("quantity"), 1)))
+    if not server_modbus_enabled():
+        device_id = get_active_edge_device_id(data, payload.get("deviceId"))
+        if not device_id:
+            return server_modbus_disabled_response()
+        result, err = execute_via_edge(device_id, "read_registers", {
+            "address": address, "startRegister": start_register, "quantity": quantity,
+        })
+        if err:
+            add_log("error", "[边缘] 寄存器读取失败：地址 %s 起始 %s 数量 %s" % (address, start_register, quantity), err)
+            return jsonify({"success": False, "message": err}), 400
+        add_log("success", "[边缘] 寄存器读取成功：地址 %s 起始 %s 数量 %s via %s" % (address, start_register, quantity, device_id))
+        return jsonify({"success": True, "data": result, "via": device_id})
     serial_profile = get_default_serial_profile(data)
     modbus_profile = get_default_modbus_profile(data)
     try:
@@ -1458,13 +1532,25 @@ def read_registers():
 
 @app.route("/api/modbus/write-register", methods=["POST"])
 def write_register():
-    if not server_modbus_enabled():
-        return server_modbus_disabled_response()
     data = load_data()
     payload = request.get_json(silent=True) or {}
     address = max(1, min(255, coerce_int(payload.get("address"), 1)))
     register = max(0, coerce_int(payload.get("register"), 0))
     value = max(0, min(65535, coerce_int(payload.get("value"), 0)))
+    if not server_modbus_enabled():
+        device_id = get_active_edge_device_id(data, payload.get("deviceId"))
+        if not device_id:
+            return server_modbus_disabled_response()
+        result, err = execute_via_edge(device_id, "write_register", {
+            "address": address, "register": register, "value": value,
+        })
+        if err:
+            add_log("error", "[边缘] 寄存器写入失败：地址 %s 寄存器 %s = %s" % (address, register, value), err)
+            return jsonify({"success": False, "message": err}), 400
+        add_log("success", "[边缘] 寄存器写入成功：地址 %s 寄存器 %s = %s via %s" % (address, register, value, device_id))
+        push_operation_history(data, "modbus.write_register.via_edge", result)
+        save_data(data)
+        return jsonify({"success": True, "data": result, "via": device_id})
     serial_profile = get_default_serial_profile(data)
     modbus_profile = get_default_modbus_profile(data)
     try:
@@ -1480,20 +1566,30 @@ def write_register():
 
 @app.route("/api/modbus/discover", methods=["POST"])
 def discover_devices():
-    if not server_modbus_enabled():
-        return server_modbus_disabled_response()
     data = load_data()
     payload = request.get_json(silent=True) or {}
     start_address = coerce_int(payload.get("startAddress"), 1)
     end_address = coerce_int(payload.get("endAddress"), start_address)
+    if not server_modbus_enabled():
+        device_id = get_active_edge_device_id(data, payload.get("deviceId"))
+        if not device_id:
+            return server_modbus_disabled_response()
+        scan_range = max(1, (end_address or start_address) - (start_address or 1) + 1)
+        edge_timeout = min(10 + scan_range * 2, 120)
+        result, err = execute_via_edge(device_id, "discover", {
+            "address": start_address, "targetAddress": end_address,
+        }, timeout=edge_timeout)
+        if err:
+            add_log("error", "[边缘] 地址扫描失败：%s-%s" % (start_address, end_address), err)
+            return jsonify({"success": False, "message": err}), 400
+        add_log("success", "[边缘] 地址扫描完成：%s-%s via %s" % (start_address, end_address, device_id))
+        return jsonify({"success": True, "data": result, "via": device_id})
     found = discover_radars(data, start_address, end_address)
     return jsonify({"success": True, "data": {"found": found}})
 
 
 @app.route("/api/modbus/address/program", methods=["POST"])
 def program_address():
-    if not server_modbus_enabled():
-        return server_modbus_disabled_response()
     data = load_data()
     payload = request.get_json(silent=True) or {}
     source_address = coerce_int(payload.get("sourceAddress"), None)
@@ -1502,6 +1598,24 @@ def program_address():
     name = str(payload.get("name") or "").strip() or None
     if source_address is None or target_address is None:
         return jsonify({"success": False, "message": "sourceAddress 和 targetAddress 必填"}), 400
+    if not server_modbus_enabled():
+        device_id = get_active_edge_device_id(data, payload.get("deviceId"))
+        if not device_id:
+            return server_modbus_disabled_response()
+        result, err = execute_via_edge(device_id, "change_address", {
+            "address": source_address, "targetAddress": target_address,
+        })
+        if err:
+            add_log("error", "[边缘] 地址编程失败：%s → %s" % (source_address, target_address), err)
+            return jsonify({"success": False, "message": err}), 400
+        # 地址编程成功后在平台侧更新雷达记录
+        try:
+            radar, slot = program_radar_address(data, source_address, target_address, slot_id=slot_id, radar_name=name)
+            add_log("success", "[边缘] 地址编程成功：%s → %s via %s" % (source_address, target_address, device_id))
+            return jsonify({"success": True, "data": {"radar": radar, "slot": slot, "edgeResult": result, "via": device_id}})
+        except (ValueError, KeyError, RuntimeError) as exc:
+            add_log("warning", "[边缘] 地址编程成功但平台记录更新失败：%s" % str(exc))
+            return jsonify({"success": True, "data": {"edgeResult": result, "via": device_id, "warning": str(exc)}})
     try:
         radar, slot = program_radar_address(data, source_address, target_address, slot_id=slot_id, radar_name=name)
     except (ValueError, KeyError, RuntimeError) as exc:
@@ -1511,9 +1625,32 @@ def program_address():
 
 @app.route("/api/modbus/poll-all", methods=["POST"])
 def poll_all_endpoint():
-    if not server_modbus_enabled():
-        return server_modbus_disabled_response()
     data = load_data()
+    payload = request.get_json(silent=True) or {}
+    if not server_modbus_enabled():
+        device_id = get_active_edge_device_id(data, payload.get("deviceId"))
+        if not device_id:
+            return server_modbus_disabled_response()
+        # 找到所有已绑定槽位的雷达，逐一下发 read_distance 命令
+        bound_radars = [
+            r for r in data.get("radars", [])
+            if r.get("address") and any(
+                s.get("radarId") == r.get("id")
+                for s in data.get("layout", {}).get("slots", [])
+            )
+        ]
+        if not bound_radars:
+            return jsonify({"success": True, "data": {"results": [], "via": device_id, "message": "无已绑定雷达"}})
+        edge_timeout = max(22, len(bound_radars) * 7)
+        results = []
+        for radar in bound_radars:
+            result, err = execute_via_edge(device_id, "read_distance", {
+                "address": radar["address"],
+            }, timeout=edge_timeout)
+            results.append({"radarId": radar["id"], "address": radar["address"],
+                            "success": err is None, "data": result, "message": err or ""})
+        add_log("info", "[边缘] 全量轮询完成：%d 台雷达 via %s" % (len(bound_radars), device_id))
+        return jsonify({"success": True, "data": {"results": results, "via": device_id}})
     with POLL_LOCK:
         results = poll_all_bound_radars(data)
     add_log("info", "已执行一次全量轮询")
@@ -1522,12 +1659,36 @@ def poll_all_endpoint():
 
 @app.route("/api/modbus/poll-one/<radar_id>", methods=["POST"])
 def poll_one_endpoint(radar_id):
-    if not server_modbus_enabled():
-        return server_modbus_disabled_response()
     data = load_data()
+    payload = request.get_json(silent=True) or {}
     radar = get_radar(data, radar_id)
     if radar is None:
         return jsonify({"success": False, "message": "radar not found"}), 404
+    if not server_modbus_enabled():
+        device_id = get_active_edge_device_id(data, payload.get("deviceId"))
+        if not device_id:
+            return server_modbus_disabled_response()
+        address = radar.get("address")
+        if not address:
+            return jsonify({"success": False, "message": "雷达未分配 Modbus 地址"}), 400
+        result, err = execute_via_edge(device_id, "read_distance", {"address": address})
+        if err:
+            radar["online"] = False
+            radar["lastPollTime"] = now_str()
+            radar["lastError"] = err
+            save_data(data)
+            add_log("error", "[边缘] 单雷达轮询失败：地址 %s" % address, err)
+            return jsonify({"success": False, "message": err}), 400
+        # 将边缘返回的距离更新到雷达记录
+        distance_mm = result.get("distanceMm") or result.get("distance_mm")
+        if distance_mm is not None:
+            radar["lastDistanceMm"] = coerce_int(distance_mm, radar.get("lastDistanceMm"))
+        radar["online"] = True
+        radar["lastPollTime"] = now_str()
+        radar["lastError"] = ""
+        save_data(data)
+        add_log("success", "[边缘] 单雷达轮询成功：地址 %s 距离 %s mm via %s" % (address, distance_mm, device_id))
+        return jsonify({"success": True, "data": dict(result, radarId=radar_id, address=address, via=device_id)})
     try:
         result = poll_radar(data, radar)
         save_data(data)
