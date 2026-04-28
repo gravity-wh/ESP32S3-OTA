@@ -517,6 +517,75 @@ static void command_task(void *arg)
     }
 }
 
+static void fetch_and_update_slot_labels(void)
+{
+    char *response = calloc(1, 2048);
+    int status_code = 0;
+
+    if (response == NULL) {
+        return;
+    }
+    if (http_get_text(RADAR_BINDING_RADAR_URL, response, 2048, &status_code) != ESP_OK ||
+        status_code < 200 || status_code >= 300) {
+        free(response);
+        return;
+    }
+
+    /* Walk each top-level JSON object in the array, tracking brace depth */
+    const char *p = response;
+    while (*p) {
+        while (*p && *p != '{') {
+            p++;
+        }
+        if (!*p) {
+            break;
+        }
+        const char *obj_start = p;
+        int depth = 0;
+        bool in_str = false;
+        while (*p) {
+            if (in_str) {
+                if (*p == '\\' && *(p + 1) != '\0') {
+                    p += 2;
+                    continue;
+                }
+                if (*p == '"') {
+                    in_str = false;
+                }
+            } else {
+                if (*p == '"') {
+                    in_str = true;
+                } else if (*p == '{') {
+                    depth++;
+                } else if (*p == '}') {
+                    depth--;
+                    if (depth == 0) {
+                        p++;
+                        break;
+                    }
+                }
+            }
+            p++;
+        }
+        size_t obj_len = (size_t)(p - obj_start);
+        if (obj_len < 10 || obj_len >= 1024) {
+            continue;
+        }
+        char obj[1024];
+        memcpy(obj, obj_start, obj_len);
+        obj[obj_len] = '\0';
+
+        int address = extract_json_int(obj, "address", 0);
+        char slot_id[16] = "";
+        extract_json_string(obj, "slotId", slot_id, sizeof(slot_id));
+        if (address > 0) {
+            radar_oled_set_radar_slot((uint8_t)address, slot_id);
+            ESP_LOGD(TAG, "slot label: addr=%d slot=%s", address, slot_id);
+        }
+    }
+    free(response);
+}
+
 static void heartbeat_task(void *arg)
 {
     (void)arg;
@@ -524,6 +593,7 @@ static void heartbeat_task(void *arg)
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(DEVICE_HEARTBEAT_INTERVAL_MS));
         send_heartbeat();
+        fetch_and_update_slot_labels();
     }
 }
 

@@ -2,7 +2,7 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.22)
 
-set(PROJECT_VER "v1.3.3")
+set(PROJECT_VER "v1.4.0")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(radar_oled_ota)

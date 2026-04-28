@@ -13,6 +13,7 @@ typedef struct {
     uint32_t poll_ok_count;
     uint32_t poll_error_count;
     char status_text[8];
+    char slot_label[12];   /* e.g. "I-A", fetched from platform */
 } radar_state_t;
 
 typedef struct {
@@ -30,6 +31,7 @@ typedef struct {
     char ota_text[20];
     char modbus_text[20];
     char app_version[32];
+    char current_slot[12]; /* slot label of radar currently being polled */
 } radar_oled_snapshot_t;
 
 esp_err_t radar_oled_app_init(void);
@@ -38,6 +40,7 @@ void radar_oled_set_wifi_status(bool connected, const char *text);
 void radar_oled_set_ota_status(bool available, bool in_progress, const char *text);
 void radar_oled_set_app_version(const char *version);
 void radar_oled_get_snapshot(radar_oled_snapshot_t *snapshot);
+void radar_oled_set_radar_slot(uint8_t address, const char *slot_label);
 esp_err_t radar_oled_execute_cloud_command(const char *action,
                                            uint8_t address,
                                            uint16_t start_register,

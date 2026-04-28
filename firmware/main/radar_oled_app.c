@@ -581,9 +581,19 @@ static void render_display_task(void *arg)
         char line3[22];
 
         radar_oled_get_snapshot(&snapshot);
-        snprintf(line0, sizeof(line0), "RADAR %s", snapshot.wifi_connected ? "WIFI" : "OFF");
-        snprintf(line1, sizeof(line1), "ID%02u %05u MM", snapshot.slave_id, snapshot.distance_mm);
-        snprintf(line2, sizeof(line2), "OCC %u/%u ID%02u", snapshot.occupied_count, snapshot.radar_count, snapshot.slave_id);
+        /* Line 0: current radar ID + slot label */
+        if (snapshot.current_slot[0] != '\0') {
+            snprintf(line0, sizeof(line0), "ID%02u  %s", snapshot.slave_id, snapshot.current_slot);
+        } else {
+            snprintf(line0, sizeof(line0), "ID%02u  ------", snapshot.slave_id);
+        }
+        /* Line 1: live distance reading */
+        snprintf(line1, sizeof(line1), "DIST: %05u MM", snapshot.distance_mm);
+        /* Line 2: occupied summary + wifi */
+        snprintf(line2, sizeof(line2), "OCC %u/%u %s",
+                 snapshot.occupied_count, snapshot.radar_count,
+                 snapshot.wifi_connected ? "WIFI" : "OFF ");
+        /* Line 3: firmware version */
         snprintf(line3, sizeof(line3), "APP %.13s", snapshot.app_version);
 
         if (s_oled_ready) {
@@ -657,6 +667,9 @@ static void radar_poll_task(void *arg)
                 }
                 s_snapshot.occupied_count = occupied_count;
                 copy_text(s_snapshot.modbus_text, sizeof(s_snapshot.modbus_text), queue[i].status_text);
+                /* show the slot label of the radar currently being polled */
+                copy_text(s_snapshot.current_slot, sizeof(s_snapshot.current_slot),
+                          s_snapshot.radars[i].slot_label);
                 xSemaphoreGive(s_state_mutex);
             }
 
@@ -748,6 +761,21 @@ void radar_oled_get_snapshot(radar_oled_snapshot_t *snapshot)
     }
     if (xSemaphoreTake(s_state_mutex, portMAX_DELAY) == pdTRUE) {
         *snapshot = s_snapshot;
+        xSemaphoreGive(s_state_mutex);
+    }
+}
+
+void radar_oled_set_radar_slot(uint8_t address, const char *slot_label)
+{
+    if (xSemaphoreTake(s_state_mutex, portMAX_DELAY) == pdTRUE) {
+        for (uint8_t i = 0; i < s_snapshot.radar_count && i < RADAR_MAX_COUNT; ++i) {
+            if (s_snapshot.radars[i].slave_id == address) {
+                copy_text(s_snapshot.radars[i].slot_label,
+                          sizeof(s_snapshot.radars[i].slot_label),
+                          slot_label != NULL ? slot_label : "");
+                break;
+            }
+        }
         xSemaphoreGive(s_state_mutex);
     }
 }
